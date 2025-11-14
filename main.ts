@@ -7,9 +7,9 @@ const kv = await Deno.openKv();
 const SECRET_TOKEN = Deno.env.get("SECRET_TOKEN") || "user-token-123";
 const ADMIN_TOKEN = Deno.env.get("ADMIN_TOKEN") || "admin-token-456";
 
-console.log("Server starting with Admin Panel and corrected Generator Page...");
+console.log("Server starting with integrated Admin Login Form...");
 
-// Helper functions (slugify, extractAndCleanMovieName)
+// Helper functions (slugify, extractAndCleanMovieName) are the same
 function extractAndCleanMovieName(url: string): string {
     try {
         const pathname = new URL(url).pathname;
@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
   const pathname = url.pathname;
   const method = req.method;
 
-  // --- ADMIN PANEL ROUTES ---
+  // --- ADMIN PANEL ROUTES (No changes here) ---
   if (pathname === "/admin") {
     if (url.searchParams.get("token") !== ADMIN_TOKEN) return new Response("Forbidden", { status: 403 });
     const videos = [];
@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
     } catch (e) { return new Response(JSON.stringify({ success: false, message: e.message }), { status: 400 }); }
   }
   
-  // --- USER-FACING ROUTES ---
+  // --- USER-FACING ROUTES (No changes here) ---
   if (pathname === "/") { return new Response(getHtmlPage(), { headers: { "Content-Type": "text/html; charset=utf-8" } }); }
   if (pathname === "/fetch-title" && method === "POST") {
       const { originalUrl } = await req.json();
@@ -55,6 +55,7 @@ Deno.serve(async (req: Request) => {
   }
   if (pathname === "/generate" && method === "POST") { 
       const { originalUrl, movieName } = await req.json();
+      if (!originalUrl || !movieName) return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
       const fileSlug = slugify(movieName);
       await kv.set(["videos", fileSlug], originalUrl);
       return new Response(JSON.stringify({ playbackUrl: `${url.origin}/play/${fileSlug}?t=${SECRET_TOKEN}` }));
@@ -82,26 +83,36 @@ Deno.serve(async (req: Request) => {
   return new Response("Not Found.", { status: 404 });
 });
 
-// Generator Page HTML (Full Version)
+// Generator & Admin Login Page HTML
 function getHtmlPage(): string {
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Auto-Suggest Link Generator</title>
-      <style>:root{--bg-color:#1a1a1a;--text-color:#f0f0f0;--primary-color:#0af;--input-bg:#2a2a2a;--border-color:#444;--success-color:#31a34a}body{font-family:system-ui,sans-serif;background-color:var(--bg-color);color:var(--text-color);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:2rem 0}.container{width:90%;max-width:600px;padding:2rem;background-color:var(--input-bg);border-radius:8px;box-shadow:0 4px 15px #0003}h1{text-align:center;margin-top:0;color:var(--primary-color)}label{display:block;margin-bottom:.5rem;font-weight:bold}input[type=text]{width:100%;padding:.75rem;margin-bottom:1.5rem;border:1px solid var(--border-color);background-color:var(--bg-color);color:var(--text-color);border-radius:4px;box-sizing:border-box}button{width:100%;padding:.75rem;border:none;background-color:var(--primary-color);color:#fff;font-size:1rem;border-radius:4px;cursor:pointer;transition:background-color .2s}button:hover:not(:disabled){background-color:#08d}button:disabled{background-color:#555;cursor:not-allowed}.result-box{margin-top:1.5rem;display:none}.result-wrapper{display:flex}#generatedLink{flex-grow:1;background-color:#333}#copyBtn{width:auto;margin-left:.5rem;background-color:var(--success-color)}#copyBtn:hover{background-color:#267c38}</style>
+      <style>
+        :root{--bg-color:#1a1a1a;--text-color:#f0f0f0;--primary-color:#0af;--input-bg:#2a2a2a;--border-color:#444;--success-color:#31a34a;--admin-color:#f90;}
+        body{font-family:system-ui,sans-serif;background-color:var(--bg-color);color:var(--text-color);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:2rem 0; flex-direction: column;}
+        .container{width:90%;max-width:600px;padding:2rem;background-color:var(--input-bg);border-radius:8px;box-shadow:0 4px 15px #0003; margin-bottom: 2rem;}
+        h1, h2{text-align:center;margin-top:0;color:var(--primary-color)}
+        label{display:block;margin-bottom:.5rem;font-weight:bold}
+        input[type=text], input[type=password]{width:100%;padding:.75rem;margin-bottom:1.5rem;border:1px solid var(--border-color);background-color:var(--bg-color);color:var(--text-color);border-radius:4px;box-sizing:border-box}
+        button{width:100%;padding:.75rem;border:none;background-color:var(--primary-color);color:#fff;font-size:1rem;border-radius:4px;cursor:pointer;transition:background-color .2s}
+        button:hover:not(:disabled){background-color:#08d}button:disabled{background-color:#555;cursor:not-allowed}
+        .result-box{margin-top:1.5rem;display:none}.result-wrapper{display:flex}#generatedLink{flex-grow:1;background-color:#333}
+        #copyBtn{width:auto;margin-left:.5rem;background-color:var(--success-color)}#copyBtn:hover{background-color:#267c38}
+        #adminLoginBtn { background-color: var(--admin-color); } #adminLoginBtn:hover { background-color: #d70; }
+        h2.admin-header { color: var(--admin-color); }
+      </style>
     </head>
     <body>
       <div class="container">
         <h1>Auto-Suggest Video Link Generator</h1>
         <label for="originalUrl">1. Paste Original Video URL:</label>
         <input type="text" id="originalUrl" placeholder="https://example.com/The.Matrix.1999.1080p.mkv">
-        
         <label for="movieName">2. Verify or Edit Movie Name (add .mp4 or .mkv):</label>
         <input type="text" id="movieName" placeholder="Will be auto-filled...">
-        
         <button id="generateBtn">3. Generate Playback Link</button>
-
         <div class="result-box" id="resultBox">
           <label for="generatedLink">Your Secure Playback Link:</label>
           <div class="result-wrapper">
@@ -110,7 +121,17 @@ function getHtmlPage(): string {
           </div>
         </div>
       </div>
+
+      <!-- NEW: ADMIN LOGIN SECTION -->
+      <div class="container">
+        <h2 class="admin-header">Admin Login</h2>
+        <label for="adminTokenInput">Enter Admin Token:</label>
+        <input type="password" id="adminTokenInput" placeholder="Your secret admin token">
+        <button id="adminLoginBtn">Login to Admin Panel</button>
+      </div>
+
       <script>
+        // Generator page logic
         const originalUrlInput = document.getElementById('originalUrl');
         const movieNameInput = document.getElementById('movieName');
         const generateBtn = document.getElementById('generateBtn');
@@ -128,47 +149,47 @@ function getHtmlPage(): string {
             if (!originalUrl.startsWith('http')) return;
             movieNameInput.value = 'Fetching name...';
             try {
-                const response = await fetch('/fetch-title', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ originalUrl })
-                });
+                const response = await fetch('/fetch-title', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originalUrl }) });
                 if (!response.ok) throw new Error('Server could not fetch title.');
                 const { suggestedName } = await response.json();
                 const extension = originalUrl.match(/\.(mp4|mkv|avi|mov|webm)$/i);
                 const finalName = suggestedName ? (suggestedName + (extension ? extension[0] : '.mp4')) : '';
                 movieNameInput.value = finalName;
-            } catch (e) {
-                console.error(e);
-                movieNameInput.value = 'Could not guess name. Please enter manually.';
-            }
+            } catch (e) { movieNameInput.value = 'Could not guess name. Please enter manually.'; }
         }
 
         generateBtn.addEventListener('click', async () => {
           const originalUrl = originalUrlInput.value.trim();
           const movieName = movieNameInput.value.trim();
-          if (!originalUrl || !movieName) { alert('Please fill in both the original URL and the movie name.'); return; }
-          generateBtn.disabled = true;
-          generateBtn.textContent = 'Generating...';
+          if (!originalUrl || !movieName) { alert('Please fill in both fields.'); return; }
+          generateBtn.disabled = true; generateBtn.textContent = 'Generating...';
           try {
-            const response = await fetch('/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ originalUrl, movieName })
-            });
+            const response = await fetch('/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ originalUrl, movieName }) });
             if (!response.ok) throw new Error((await response.json()).error || 'Failed to generate link.');
             const { playbackUrl } = await response.json();
-            generatedLinkInput.value = playbackUrl;
-            resultBox.style.display = 'block';
+            generatedLinkInput.value = playbackUrl; resultBox.style.display = 'block';
           } catch (e) { alert('Error: ' + e.message);
           } finally { generateBtn.disabled = false; generateBtn.textContent = '3. Generate Playback Link'; }
         });
 
         copyBtn.addEventListener('click', () => {
           navigator.clipboard.writeText(generatedLinkInput.value).then(() => {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
           });
+        });
+
+        // NEW: Admin login logic
+        const adminTokenInput = document.getElementById('adminTokenInput');
+        const adminLoginBtn = document.getElementById('adminLoginBtn');
+
+        adminLoginBtn.addEventListener('click', () => {
+            const token = adminTokenInput.value.trim();
+            if (!token) {
+                alert('Please enter your admin token.');
+                return;
+            }
+            // Construct the admin URL and redirect the user
+            window.location.href = \`\${window.location.origin}/admin?token=\${encodeURIComponent(token)}\`;
         });
       <\/script>
     </body>
@@ -176,38 +197,25 @@ function getHtmlPage(): string {
   `;
 }
 
-// Admin Page HTML (Full Version)
+// Admin Page HTML for listing and deleting (no changes)
 function getAdminPage(videos: any[], token: string): string {
     let videoListHtml = videos.length > 0 ? '' : '<tr><td colspan="3" style="text-align:center;">No videos generated yet.</td></tr>';
     for (const video of videos) {
-        videoListHtml += `
-            <tr id="row-${video.key}">
-                <td><code>/stream/${video.key}</code></td>
-                <td class="original-url">${video.value}</td>
-                <td><button class="delete-btn" data-slug="${video.key}">Delete</button></td>
-            </tr>
-        `;
+        videoListHtml += `<tr id="row-${video.key}"><td><code>/stream/${video.key}</code></td><td class="original-url">${video.value}</td><td><button class="delete-btn" data-slug="${video.key}">Delete</button></td></tr>`;
     }
-
-    return `
-    <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Admin Panel - Link Management</title><style>body{font-family:sans-serif;background:#1a1a1a;color:#f0f0f0;padding:2rem}table{width:100%;border-collapse:collapse}th,td{padding:12px;border:1px solid #444;text-align:left;vertical-align:middle}th{background:#0af}.original-url{word-break:break-all;max-width:300px}.delete-btn{background:#e44;color:white;border:none;padding:8px 12px;cursor:pointer;border-radius:4px}.delete-btn:hover{background:#c22}</style></head>
-    <body><h1>Link Management Admin Panel</h1><table><thead><tr><th>Generated Link Path</th><th>Original URL</th><th>Action</th></tr></thead><tbody>${videoListHtml}</tbody></table>
-    <script>
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Admin Panel - Link Management</title><style>body{font-family:sans-serif;background:#1a1a1a;color:#f0f0f0;padding:2rem}table{width:100%;border-collapse:collapse}th,td{padding:12px;border:1px solid #444;text-align:left;vertical-align:middle}th{background:#0af}.original-url{word-break:break-all;max-width:300px}.delete-btn{background:#e44;color:white;border:none;padding:8px 12px;cursor:pointer;border-radius:4px}.delete-btn:hover{background:#c22}</style></head><body><h1>Link Management Admin Panel</h1><table><thead><tr><th>Generated Link Path</th><th>Original URL</th><th>Action</th></tr></thead><tbody>${videoListHtml}</tbody></table><script>
         const ADMIN_TOKEN = "${token}";
         document.body.addEventListener('click', async (event) => {
             if (event.target.classList.contains('delete-btn')) {
-                const button = event.target;
-                const slug = button.dataset.slug;
-                if (confirm(\`Are you sure you want to delete the link for: \${slug}?\`)) {
+                const button = event.target; const slug = button.dataset.slug;
+                if (confirm(\`Are you sure you want to delete: \${slug}?\`)) {
                     try {
                         const response = await fetch(\`/delete/\${slug}\`, { method: 'DELETE', headers: { 'Authorization': \`Bearer \${ADMIN_TOKEN}\` } });
                         const result = await response.json();
-                        if (result.success) { document.getElementById(\`row-\${slug}\`).remove(); } 
-                        else { alert('Error: ' + result.message); }
+                        if (result.success) { document.getElementById(\`row-\${slug}\`).remove(); } else { alert('Error: ' + result.message); }
                     } catch (e) { alert('An error occurred: ' + e.message); }
                 }
             }
         });
-    <\/script></body></html>
-    `;
+    <\/script></body></html>`;
 }
